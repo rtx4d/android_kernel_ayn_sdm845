@@ -3415,11 +3415,11 @@ void __init tcp_init(void)
 	}
 
 
-	cnt = tcp_hashinfo.ehash_mask + 1;
+	cnt = tcp_hashinfo.ehash_mask + 1; // 32768
 
 	tcp_death_row.sysctl_max_tw_buckets = cnt / 2;
 	sysctl_tcp_max_orphans = cnt / 2;
-	sysctl_max_syn_backlog = max(128, cnt / 256);
+	sysctl_max_syn_backlog = max(16384, cnt / 256); // 128
 
 	tcp_init_mem();
 	/* Set per-socket limits to no more than 1/128 the pressure threshold */
@@ -3427,10 +3427,12 @@ void __init tcp_init(void)
 	max_wshare = min(4UL*1024*1024, limit);
 	max_rshare = min(6UL*1024*1024, limit);
 
+	// 524288  1048576 4525824
 	sysctl_tcp_wmem[0] = SK_MEM_QUANTUM;
 	sysctl_tcp_wmem[1] = 16*1024;
 	sysctl_tcp_wmem[2] = max(64*1024, max_wshare);
 
+	// 1730560 3461120 6922240
 	sysctl_tcp_rmem[0] = SK_MEM_QUANTUM;
 	sysctl_tcp_rmem[1] = 87380;
 	sysctl_tcp_rmem[2] = max(87380, max_rshare);

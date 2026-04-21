@@ -1443,6 +1443,17 @@ config TOUCHSCREEN_EKTF3XXX_CHIPSET
 	  report 10 touches at a time.
 
 		  If unusre, say N.
+config CONFIG_TOUCHSCREEN_FTS
+       bool "Focaltech Touchscreen"
+       depends on I2C
+       help
+         Say Y here if you have a Focaltech Touchscreen.
+         Focaltech controllers are multi touch controllers which can
+         report 5 touches at a time.
+
+         If unsure, say N.
+		 
+source "drivers/input/touchscreen/focaltech_touch/Kconfig"
 
 config TOUCHSCREEN_RAYDIUM_CHIPSET
 	bool "Raydium WT030 touchpanel CHIPSET"

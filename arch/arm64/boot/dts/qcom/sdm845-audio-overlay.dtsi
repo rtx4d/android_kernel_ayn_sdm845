@@ -22,14 +22,16 @@
 		"MADINPUT", "MCLK",
 		"hifi amp", "LINEOUT1",
 		"hifi amp", "LINEOUT2",
+		"AMIC1", "MIC BIAS1",
+		"MIC BIAS1", "Handset Mic",				
 		"AMIC2", "MIC BIAS2",
 		"MIC BIAS2", "Headset Mic",
-		"AMIC3", "MIC BIAS2",
-		"MIC BIAS2", "ANCRight Headset Mic",
-		"AMIC4", "MIC BIAS2",
-		"MIC BIAS2", "ANCLeft Headset Mic",
-		"AMIC5", "MIC BIAS3",
-		"MIC BIAS3", "Handset Mic",
+		"AMIC3", "MIC BIAS3",
+		"MIC BIAS3", "ANCRight Headset Mic",
+		"AMIC4", "MIC BIAS4",
+		"MIC BIAS4", "ANCLeft Headset Mic",
+		"AMIC5", "MIC BIAS1",
+		"MIC BIAS1", "Handset Mic",
 		"DMIC0", "MIC BIAS1",
 		"MIC BIAS1", "Digital Mic0",
 		"DMIC1", "MIC BIAS1",
@@ -99,6 +101,7 @@
 	};
 
 	wcd_rst_gpio: msm_cdc_pinctrl@64 {
+	    status = "okay";
 		compatible = "qcom,msm-cdc-pinctrl";
 		qcom,cdc-rst-n-gpio = <&tlmm 64 0>;
 		pinctrl-names = "aud_active", "aud_sleep";
@@ -121,6 +124,7 @@
 
 &slim_aud {
 	wcd934x_cdc: tavil_codec {
+	    status = "okay";
 		compatible = "qcom,tavil-slim-pgd";
 		elemental-addr = [00 01 50 02 17 02];
 

@@ -29,3 +29,9 @@
 	qcom,msm-id = <321 0x20001>;
 	qcom,board-id = <8 0>;
 };
+
+//zhounengwen@163.com begin
+&dsi_lt8912_1080_dsi1_video_display {
+	qcom,dsi-display-active;
+};
+//zhounengwen@163.com end

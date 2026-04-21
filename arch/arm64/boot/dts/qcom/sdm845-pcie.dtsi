@@ -15,7 +15,8 @@
 
 &soc {
 	pcie0: qcom,pcie@0x1c00000 {
-		compatible = "qcom,pci-msm";
+		status = "disabled";
+		//compatible = "qcom,pci-msm";
 		cell-index = <0>;
 
 		reg = <0x1c00000 0x2000>,
@@ -270,7 +271,8 @@
 	};
 
 	pcie1: qcom,pcie@0x1c08000 {
-		compatible = "qcom,pci-msm";
+		//compatible = "qcom,pci-msm";
+		status = "disabled";
 		cell-index = <1>;
 
 		reg = <0x1c08000 0x2000>,
@@ -462,7 +464,7 @@
 			&pcie1_wake_default>;
 
 		perst-gpio = <&tlmm 102 0>;
-		wake-gpio = <&tlmm 104 0>;
+		wake-gpio = <&tlmm 11 0>;
 
 		gdsc-vdd-supply = <&pcie_1_gdsc>;
 		vreg-1.8-supply = <&pm8998_l26>;

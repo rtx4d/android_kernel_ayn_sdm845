@@ -130,6 +130,7 @@
 		};
 
 		wsa_spkr_wcd_sd1: msm_cdc_pinctrll {
+		      status = "okay";
 		      compatible = "qcom,msm-cdc-pinctrl";
 		      pinctrl-names = "aud_active", "aud_sleep";
 		      pinctrl-0 = <&spkr_1_wcd_en_active>;
@@ -137,6 +138,7 @@
 		};
 
 		wsa_spkr_wcd_sd2: msm_cdc_pinctrlr {
+		      status = "okay";
 		      compatible = "qcom,msm-cdc-pinctrl";
 		      pinctrl-names = "aud_active", "aud_sleep";
 		      pinctrl-0 = <&spkr_2_wcd_en_active>;

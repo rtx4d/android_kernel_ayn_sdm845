@@ -546,6 +546,7 @@ struct debugfs_files {
 	struct dentry *err_stats;
 	struct dentry *show_hba;
 	struct dentry *host_regs;
+	struct dentry *get_info_quec;
 	struct dentry *dump_dev_desc;
 	struct dentry *power_mode;
 	struct dentry *dme_local_read;

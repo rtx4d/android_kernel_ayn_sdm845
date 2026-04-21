@@ -714,6 +714,7 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 set_sndbuf:
 		sk->sk_userlocks |= SOCK_SNDBUF_LOCK;
 		sk->sk_sndbuf = max_t(int, val * 2, SOCK_MIN_SNDBUF);
+		//pr_err("sock_setsockopt() %d, %u\n", sk->sk_sndbuf, sysctl_wmem_max);
 		/* Wake up sending tasks if we upped the value. */
 		sk->sk_write_space(sk);
 		break;
@@ -750,6 +751,7 @@ set_rcvbuf:
 		 * is the most desirable behavior.
 		 */
 		sk->sk_rcvbuf = max_t(int, val * 2, SOCK_MIN_RCVBUF);
+		//pr_err("sock_setsockopt() %d, %u\n", sk->sk_rcvbuf, sysctl_rmem_max);
 		break;
 
 	case SO_RCVBUFFORCE:
@@ -2449,6 +2451,8 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 	sk->sk_state		=	TCP_CLOSE;
 	sk_set_socket(sk, sock);
 
+	//pr_err("sock_init_data() %u, %u\n", sysctl_rmem_default, sysctl_wmem_default);
+	//WARN_ON(1);
 	sock_set_flag(sk, SOCK_ZAPPED);
 
 	if (sock) {
@@ -3082,6 +3086,7 @@ static const struct file_operations proto_seq_fops = {
 
 static __net_init int proto_init_net(struct net *net)
 {
+	//pr_err("proto_init_net() %d, %lu, %lu, %d, %d\n", _SK_MEM_OVERHEAD, SK_RMEM_MAX, SK_WMEM_MAX, SOCK_MIN_RCVBUF, SOCK_MIN_SNDBUF);
 	if (!proc_create("protocols", S_IRUGO, net->proc_net, &proto_seq_fops))
 		return -ENOMEM;
 

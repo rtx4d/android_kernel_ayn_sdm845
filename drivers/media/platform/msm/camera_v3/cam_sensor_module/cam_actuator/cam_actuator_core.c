@@ -251,7 +251,9 @@ int32_t cam_actuator_apply_settings(struct cam_actuator_ctrl_t *a_ctrl,
 	struct i2c_settings_array *i2c_set)
 {
 	struct i2c_settings_list *i2c_list;
-	int32_t rc = 0;
+	//int32_t rc = 0;
+	int32_t rc = 0, reg_data;
+	uint16_t i2c_byte1, i2c_byte2;
 
 	if (a_ctrl == NULL || i2c_set == NULL) {
 		CAM_ERR(CAM_ACTUATOR, "Invalid Args");
@@ -265,6 +267,17 @@ int32_t cam_actuator_apply_settings(struct cam_actuator_ctrl_t *a_ctrl,
 
 	list_for_each_entry(i2c_list,
 		&(i2c_set->list_head), list) {
+		reg_data = i2c_list->i2c_settings.reg_setting[0].reg_data;
+		if (i2c_list->i2c_settings.reg_setting[0].reg_addr == 0xFFFF &&
+			i2c_list->i2c_settings.size == 1) {
+			reg_data = reg_data | 0x0000000F;
+			i2c_byte1 = (reg_data & 0xFF00) >> 8;
+			i2c_byte2 = reg_data & 0xFF;
+			i2c_list->i2c_settings.reg_setting[0].reg_addr =
+			i2c_byte1;
+			i2c_list->i2c_settings.reg_setting[0].reg_data =
+			i2c_byte2;
+		}
 		rc = cam_actuator_i2c_modes_util(
 			&(a_ctrl->io_master_info),
 			i2c_list);

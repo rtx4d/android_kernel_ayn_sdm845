@@ -251,6 +251,14 @@ static int32_t cam_sensor_i2c_pkt_parse(struct cam_sensor_ctrl_t *s_ctrl,
 		CAM_ERR(CAM_SENSOR, "Fail parsing I2C Pkt: %d", rc);
 		goto rel_pkt_buf;
 	}
+	/*add for lt6911, no need write i2c*/
+	if((s_ctrl->sensordata->slave_info.sensor_slave_addr==0x56)&&
+			(s_ctrl->sensordata->slave_info.sensor_id==0xff)&&
+			(s_ctrl->sensordata->slave_info.sensor_id_reg_addr==0x0)){
+		CAM_ERR(CAM_SENSOR, "lt6911: no need write settings code:%d, i2c addr: 0x%x",
+			(csl_packet->header.op_code & 0xFFFFFF),s_ctrl->sensordata->slave_info.sensor_slave_addr);
+		i2c_reg_settings->is_settings_valid = 0;
+	}
 
 	if ((csl_packet->header.op_code & 0xFFFFFF) ==
 		CAM_SENSOR_PACKET_OPCODE_SENSOR_UPDATE) {
@@ -614,6 +622,9 @@ void cam_sensor_shutdown(struct cam_sensor_ctrl_t *s_ctrl)
 	s_ctrl->sensor_state = CAM_SENSOR_INIT;
 }
 
+int init_lt6911uxc(struct cam_sensor_ctrl_t *s_ctrl, int status);
+int lt6911_check_chip_id(struct cam_sensor_ctrl_t *s_ctrl);
+
 int cam_sensor_match_id(struct cam_sensor_ctrl_t *s_ctrl)
 {
 	int rc = 0;
@@ -628,6 +639,13 @@ int cam_sensor_match_id(struct cam_sensor_ctrl_t *s_ctrl)
 		return -EINVAL;
 	}
 
+	/*add for lt6911, no need read id*/
+	if((slave_info->sensor_slave_addr==0x56)&&
+			(slave_info->sensor_id == 0xff)&&
+			(slave_info->sensor_id_reg_addr==0x0)){
+		rc = lt6911_check_chip_id(s_ctrl);
+		return rc;
+	}
 	rc = camera_io_dev_read(
 		&(s_ctrl->io_master_info),
 		slave_info->sensor_id_reg_addr,
@@ -637,7 +655,9 @@ int cam_sensor_match_id(struct cam_sensor_ctrl_t *s_ctrl)
 	CAM_DBG(CAM_SENSOR, "read id: 0x%x expected id 0x%x:",
 			 chipid, slave_info->sensor_id);
 	if (cam_sensor_id_by_mask(s_ctrl, chipid) != slave_info->sensor_id) {
-		CAM_ERR(CAM_SENSOR, "chip id %x does not match %x",
+		CAM_ERR(CAM_SENSOR, "slot:%d,slave_addr:0x%x,chip id %x does not match %x",
+				s_ctrl->soc_info.index,
+				s_ctrl->sensordata->slave_info.sensor_slave_addr,
 				chipid, slave_info->sensor_id);
 		return -ENODEV;
 	}
@@ -798,6 +818,16 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 			goto release_mutex;
 		}
 
+		/*if(s_ctrl->sensordata->slave_info.sensor_slave_addr == 0x56 &&
+			s_ctrl->sensordata->slave_info.sensor_id == 0xff &&
+			s_ctrl->sensordata->slave_info.sensor_id_reg_addr == 0x0){
+			rc = init_lt6911uxc(s_ctrl, 1);
+			if (rc < 0) {
+				CAM_ERR(CAM_SENSOR, "init lt6911uxc failed");
+				goto release_mutex;
+			}
+		}*/
+
 		s_ctrl->sensor_state = CAM_SENSOR_ACQUIRE;
 		s_ctrl->last_flush_req = 0;
 		CAM_INFO(CAM_SENSOR,
@@ -824,6 +854,16 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 			rc = -EAGAIN;
 			goto release_mutex;
 		}
+
+		/*if(s_ctrl->sensordata->slave_info.sensor_slave_addr == 0x56 &&
+			s_ctrl->sensordata->slave_info.sensor_id == 0xff &&
+			s_ctrl->sensordata->slave_info.sensor_id_reg_addr == 0x0){
+			rc = init_lt6911uxc(s_ctrl, 0);
+			if (rc < 0) {
+				CAM_ERR(CAM_SENSOR, "release lt6911uxc failed");
+				goto release_mutex;
+			}
+		}*/
 
 		rc = cam_sensor_power_down(s_ctrl);
 		if (rc < 0) {

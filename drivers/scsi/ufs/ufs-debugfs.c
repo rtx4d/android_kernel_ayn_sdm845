@@ -850,8 +850,148 @@ static int ufsdbg_host_regs_open(struct inode *inode, struct file *file)
 static const struct file_operations ufsdbg_host_regs_fops = {
 	.open		= ufsdbg_host_regs_open,
 	.read		= seq_read,
-	.release	= single_release,
+	.release    = single_release,
 };
+
+#if 1//geoff
+extern int ufshcd_read_device_desc_quec(struct ufs_hba *hba,int idn, u8 *buf, u32 size);
+int quec_get_ufslife(struct seq_file *file, void *data)
+{
+	int err = 0;
+
+	int buff_len = 37;
+	u8 desc_buf[37];
+	//int i=0;
+	struct ufs_hba *hba = (struct ufs_hba *)file->private;
+	pm_runtime_get_sync(hba->dev);
+	err = ufshcd_read_device_desc_quec(hba,0x09, desc_buf, buff_len);
+	pm_runtime_put_sync(hba->dev);
+
+	if (!err) {
+				seq_printf(file,"ufs_life_time[%04x%04x]\n",desc_buf[3],desc_buf[4]);
+		//		"geoff[data [0x%x][0x%x][0x%x][0x%x]",desc_buf[0],desc_buf[1],desc_buf[2],desc_buf[3]);
+	} else {
+		seq_printf(file, "Reading Device Descriptor failed. err = %d\n",err);
+	}
+	//for(i=0;i<buff_len;i++)
+//	pr_err("-------geoff--buf[%d]_[0x%x]------",i,desc_buf[i]);
+	return err;
+}
+static int quec_get_ufslife_open(struct inode *inode, struct file *file)
+{
+	return single_open(file,
+			   quec_get_ufslife, inode->i_private);
+}
+
+static const struct file_operations quec_get_ufslife_desc = {//geoff
+	.open		= quec_get_ufslife_open,
+	.read		= seq_read,
+};
+
+char ufs_change_char_hex(char c)
+{
+    if ((c >= '0') && (c <= '9'))
+        return (c - '0');
+    else if ((c >= 'a') && (c <= 'f'))
+        return (c - 'a' + 10);
+    else if ((c >= 'A') && (c <= 'F'))
+        return (c - 'A' + 10);
+
+    return 0;
+}
+
+char ufs_change_char_excsd(char c1, char c2)
+{
+    printk(KERN_DEBUG "%s:%d c1=0x%x, c2=0x%x\n", __func__, __LINE__, c1, c2);
+
+    return ufs_change_char_hex(c1) * 16 +ufs_change_char_hex(c2);
+}
+
+int quec_get_ufscapacity(struct seq_file *file, void *data)
+{
+	int err = 0;
+
+	int buff_len = 48;
+	u8 desc_buf[48];
+	int i=0;
+    u32 capacity = 0;
+	struct ufs_hba *hba = (struct ufs_hba *)file->private;
+	pm_runtime_get_sync(hba->dev);
+	err = ufshcd_read_device_desc_quec(hba,0x07, desc_buf, buff_len);
+	pm_runtime_put_sync(hba->dev);
+	for(i=4;i<12;i++)
+	capacity=capacity*256+desc_buf[i];
+
+
+	//capacity=(((desc_buf[8]*256+desc_buf[9])*256+desc_buf[10])*256+desc_buf[11])/2048;
+	//memcpy(&capacity, desc_buf+6, 4);
+   // return capacity/2048;
+	//for(i=0;i<buff_len;i++)
+	//pr_err("-------quec_get_ufscapacity--buf[%d]_[0x%x]------",i,desc_buf[i]);
+	seq_printf(file,"ufs_capacity%04dMB\n",capacity/2048);
+	return err;
+}
+static int quec_get_ufscapacity_open(struct inode *inode, struct file *file)
+{
+	return single_open(file,
+			   quec_get_ufscapacity, inode->i_private);
+}
+
+static const struct file_operations quec_get_ufscapacity_desc = {//geoff
+	.open		= quec_get_ufscapacity_open,
+	.read		= seq_read,
+};
+
+
+
+int quec_get_ufsname(struct seq_file *file, void *data)
+{
+	int err = 0;
+	u8 str_desc_buf[QUERY_DESC_MAX_SIZE + 1];
+	//int buff_len = 18;
+	//u8 desc_buf[18];
+	//int i=0;
+	struct ufs_hba *hba = (struct ufs_hba *)file->private;
+	memset(str_desc_buf, 0, QUERY_DESC_MAX_SIZE);
+	err = ufshcd_read_string_desc(hba, hba->dev_info.i_product_name,str_desc_buf, QUERY_DESC_MAX_SIZE, ASCII_STD);
+	seq_printf(file,"Manufacturer Name%s\n",str_desc_buf+2);
+	//pr_err("----%s----/n",hba->dev_info.i_product_name);
+	//for(i=0;i<QUERY_DESC_MAX_SIZE;i++)
+	//pr_err("-------quec_get_ufsname--buf[%d]_[0x%x]------",i,str_desc_buf[i]);
+	return err;
+}
+static int quec_get_ufsname_open(struct inode *inode, struct file *file)
+{
+	return single_open(file,
+			   quec_get_ufsname, inode->i_private);
+}
+
+static const struct file_operations quec_get_ufsname_desc = {//geoff
+	.open		= quec_get_ufsname_open,
+	.read		= seq_read,
+};
+
+
+static int quec_ufs_debugfs_create(struct ufs_hba *hba)
+{
+    printk(KERN_INFO "quec debugfs create\n");
+	debugfs_create_file("quec_ufs_life", S_IRUSR|S_IRGRP|S_IROTH,
+				    hba->debugfs_files.debugfs_root, hba,
+				    &quec_get_ufslife_desc);
+		debugfs_create_file("quec_ufs_capacity", S_IRUSR|S_IRGRP|S_IROTH,
+				    hba->debugfs_files.debugfs_root, hba,
+				    &quec_get_ufscapacity_desc);
+		debugfs_create_file("quec_ufs_name", S_IRUSR|S_IRGRP|S_IROTH,
+				    hba->debugfs_files.debugfs_root, hba,
+				    &quec_get_ufsname_desc);
+    return 0;
+}
+
+
+#endif
+
+
+
 
 static int ufsdbg_dump_device_desc_show(struct seq_file *file, void *data)
 {
@@ -1603,6 +1743,8 @@ void ufsdbg_add_debugfs(struct ufs_hba *hba)
 			__func__);
 		goto err;
 	}
+
+	quec_ufs_debugfs_create(hba);
 
 	hba->debugfs_files.host_regs = debugfs_create_file("host_regs", S_IRUSR,
 				hba->debugfs_files.debugfs_root, hba,

@@ -121,7 +121,8 @@ static void mmc_host_clk_gate_delayed(struct mmc_host *host)
 	unsigned long flags;
 
 	if (!freq) {
-		pr_debug("%s: frequency set to 0 in disable function, "
+		//WARN_ON(1);
+		pr_err("%s: frequency set to 0 in disable function, "
 			 "this means the clock is already disabled.\n",
 			 mmc_hostname(host));
 		return;
