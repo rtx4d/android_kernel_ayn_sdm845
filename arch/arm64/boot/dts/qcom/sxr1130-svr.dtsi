@@ -288,7 +288,7 @@
 	qcom,mdss-dsi-bl-min-level = <1>;
 	qcom,mdss-dsi-bl-max-level = <4095>;
 	qcom,mdss-dsi-mode-sel-gpio-state = "dual_port";
-	qcom,panel-mode-gpio = <&tlmm 79 0>;
+	//qcom,panel-mode-gpio = <&tlmm 79 0>;
 	qcom,platform-reset-gpio = <&tlmm 75 0>;
 	qcom,led-5v-en-gpio = <&tlmm 134 0>;
 	qcom,selab-gpio = <&tlmm 105 0>;/* High for DSI */

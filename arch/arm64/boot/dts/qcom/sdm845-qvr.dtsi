@@ -70,15 +70,15 @@
 };
 
 &qupv3_se3_i2c {
-	status = "ok";
+	status = "disabled";
 	nq@28 {
 		compatible = "qcom,nq-nci";
 		reg = <0x28>;
 		qcom,nq-irq = <&tlmm 63 0x00>;
 		qcom,nq-ven = <&tlmm 12 0x00>;
 		qcom,nq-firm = <&tlmm 62 0x00>;
-		qcom,nq-clkreq = <&pm8998_gpios 21 0x00>;
-		qcom,nq-esepwr = <&tlmm 116 0x00>;
+		//qcom,nq-clkreq = <&pm8998_gpios 21 0x00>;
+		//qcom,nq-esepwr = <&tlmm 116 0x00>;
 		interrupt-parent = <&tlmm>;
 		qcom,clk-src = "BBCLK3";
 		interrupts = <63 0>;
@@ -223,6 +223,7 @@
 
 &qupv3_se5_i2c {
 	status = "ok";
+/*
 	synaptics_dsx@20 {
 		compatible = "synaptics,dsx-i2c";
 		reg = <0x20>;
@@ -238,7 +239,7 @@
 		synaptics,pwr-reg-name = "avdd";
 		synaptics,bus-reg-name = "vdd";
 		synaptics,ub-i2c-addr = <0x2c>;
-		synaptics,irq-gpio = <&tlmm 122 0x2008>;
+		//synaptics,irq-gpio = <&tlmm 122 0x2008>;
 		synaptics,reset-gpio = <&tlmm 99 0x0>;
 		synaptics,irq-on-state = <0>;
 		synaptics,power-delay-ms = <200>;
@@ -246,4 +247,5 @@
 		synaptics,reset-on-state = <0>;
 		synaptics,reset-active-ms = <20>;
 	};
+*/
 };

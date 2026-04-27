@@ -24,14 +24,8 @@
 #include "sdm845-audio-overlay.dtsi"
 
 / {
-	model = "Qualcomm Technologies, Inc. SDM845 v2.1 MTP";
+	model = "Qualcomm Technologies, Inc. SDM845 v2.1 OEM";
 	compatible = "qcom,sdm845-mtp", "qcom,sdm845", "qcom,mtp";
 	qcom,msm-id = <321 0x20001>;
-	qcom,board-id = <8 0>;
+	qcom,board-id = <5 0>;
 };
-
-//zhounengwen@163.com begin
-&dsi_lt8912_1080_dsi1_video_display {
-	qcom,dsi-display-active;
-};
-//zhounengwen@163.com end

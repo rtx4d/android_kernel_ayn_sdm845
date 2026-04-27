@@ -134,6 +134,7 @@
 		      pinctrl-names = "aud_active", "aud_sleep";
 		      pinctrl-0 = <&spkr_1_wcd_en_active>;
 		      pinctrl-1 = <&spkr_1_wcd_en_sleep>;
+		      status = "okay";
 		};
 
 		wsa_spkr_wcd_sd2: msm_cdc_pinctrlr {
@@ -141,6 +142,7 @@
 		      pinctrl-names = "aud_active", "aud_sleep";
 		      pinctrl-0 = <&spkr_2_wcd_en_active>;
 		      pinctrl-1 = <&spkr_2_wcd_en_sleep>;
+		      status = "okay";
 		};
 
 		tavil_us_euro_sw: msm_cdc_pinctrl_us_euro_sw {

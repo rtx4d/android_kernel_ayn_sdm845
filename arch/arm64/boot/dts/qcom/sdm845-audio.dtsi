@@ -94,6 +94,7 @@
 				"msm-dai-q6-tdm.36912", "msm-dai-q6-tdm.36913",
 				"msm-dai-q6-tdm.36914",
 				"msm-dai-q6-dev.8194", "msm-dai-q6-dev.8195";
+	    status = "okay";
 	};
 };
 
@@ -101,6 +102,7 @@
 	msm_dai_slim {
 		compatible = "qcom,msm-dai-slim";
 		elemental-addr = [ff ff ff fe 17 02];
+	    status = "okay";
 	};
 };
 
