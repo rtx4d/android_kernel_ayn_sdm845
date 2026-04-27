@@ -33,6 +33,10 @@
 
 #include "sde_dbg.h"
 
+#ifdef CONFIG_DRM_I2C_LT8912
+#include "../../bridge/lt8912/lt8912.h"
+#endif
+
 #define DSI_CTRL_DEFAULT_LABEL "MDSS DSI CTRL"
 
 #define DSI_CTRL_TX_TO_MS     200
@@ -3273,6 +3277,12 @@ int dsi_ctrl_set_vid_engine_state(struct dsi_ctrl *dsi_ctrl,
 	pr_debug("[DSI_%d] Set video engine state = %d\n", dsi_ctrl->cell_index,
 		 state);
 	dsi_ctrl_update_state(dsi_ctrl, DSI_CTRL_OP_VID_ENGINE, state);
+/*#ifdef CONFIG_DRM_I2C_LT8912
+	    if (on)
+		  lt8912_on(dsi_ctrl->cell_index);
+		else
+		  lt8912_off(dsi_ctrl->cell_index);
+#endif*/
 error:
 	mutex_unlock(&dsi_ctrl->ctrl_lock);
 	return rc;

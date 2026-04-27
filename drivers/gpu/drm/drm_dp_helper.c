@@ -209,6 +209,7 @@ static int drm_dp_dpcd_access(struct drm_dp_aux *aux, u8 request,
 
 		ret = aux->transfer(aux, &msg);
 
+		//printk("%s:transfer->ret=%d retry=%d\n", __func__, ret, retry);
 		if (ret >= 0) {
 			native_reply = msg.reply & DP_AUX_NATIVE_REPLY_MASK;
 			if (native_reply == DP_AUX_NATIVE_REPLY_ACK) {
@@ -227,6 +228,12 @@ static int drm_dp_dpcd_access(struct drm_dp_aux *aux, u8 request,
 		 */
 		if (!err)
 			err = ret;
+
+		if(ret == -EINVAL){//wufei: If aux return EINVAL, the system will stall. Must break.
+			if(retry >= 3)
+				break;
+		}
+
 	}
 
 	DRM_DEBUG_KMS("Too many retries, giving up. First error: %d\n", err);

@@ -158,6 +158,34 @@ static size_t build_pmic_string(char *buf, size_t n, int sid,
 	return pos;
 }
 
+#define QUECTEL_QDEVINFO_CMD
+#ifdef  QUECTEL_QDEVINFO_CMD
+
+static char quectel_pmic_info[64] = {'\0'};
+
+static size_t quectel_get_pmic_string(char *string)
+{
+    char buf[64] = {'\0'};
+  //  int sid_temp = 0;
+
+    if (quectel_pmic_info[0] != '\0')
+        sprintf(buf, "%s,", quectel_pmic_info); //add a "," for pm and pmi
+    else
+        memcpy(buf, quectel_pmic_info, 64);
+	printk("quec_pmic:%s",string);
+	snprintf(quectel_pmic_info,64,"%s%s", buf, string);
+    return 0;
+}
+
+void quectel_get_pmic_info(char *buf)
+{
+    snprintf(buf, sizeof(quectel_pmic_info), "%s", quectel_pmic_info);
+    return;
+}
+
+EXPORT_SYMBOL(quectel_get_pmic_info);
+
+#endif /* QUECTEL_QDEVINFO_CMD */
 #define PMIC_PERIPHERAL_TYPE		0x51
 #define PMIC_STRING_MAXLENGTH		80
 static int qpnp_revid_probe(struct platform_device *pdev)
@@ -250,6 +278,9 @@ static int qpnp_revid_probe(struct platform_device *pdev)
 	build_pmic_string(pmic_string, PMIC_STRING_MAXLENGTH,
 			  to_spmi_device(pdev->dev.parent)->usid,
 			pmic_subtype, rev1, rev2, rev3, rev4);
+    #ifdef QUECTEL_QDEVINFO_CMD
+        quectel_get_pmic_string(pmic_string);
+    #endif
 	pr_info("%s options: %d, %d, %d, %d\n",
 			pmic_string, option1, option2, option3, option4);
 	return 0;

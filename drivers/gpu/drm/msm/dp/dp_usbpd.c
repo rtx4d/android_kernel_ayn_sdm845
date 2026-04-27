@@ -333,7 +333,7 @@ static int dp_usbpd_get_ss_lanes(struct dp_usbpd_private *pd)
 		while (timeout) {
 			rc = pd->svid_handler.request_usb_ss_lane(
 					pd->pd, &pd->svid_handler);
-			if (rc != -EBUSY)
+			if (rc == 0)
 				break;
 
 			pr_warn("USB busy, retry\n");
@@ -420,8 +420,10 @@ static void dp_usbpd_response_cb(struct usbpd_svid_handler *hdlr, u8 cmd,
 			break;
 		}
 
-		if (pd->dp_cb && pd->dp_cb->configure)
+		if (pd->dp_cb && pd->dp_cb->configure){
+			pr_debug("%s:start dp_cb configure\n", __func__);
 			pd->dp_cb->configure(pd->dev);
+		}
 		break;
 	default:
 		pr_err("unknown cmd: %d\n", cmd);

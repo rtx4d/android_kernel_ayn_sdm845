@@ -755,6 +755,34 @@ static int scsi_probe_lun(struct scsi_device *sdev, unsigned char *inq_result,
 	return 0;
 }
 
+#define QUECTEL_QDEVINFO_CMD
+
+#ifdef  QUECTEL_QDEVINFO_CMD
+static char quec_ufs_vendor_info[32] = { '\0' };
+static char quec_ufs_model_info[32] = { '\0' };
+
+void quectel_get_ufs_vendor_info(char *buf, int size)
+{
+	size = (size < sizeof(quec_ufs_vendor_info)) ? size:sizeof(quec_ufs_vendor_info);
+	snprintf(buf, size, "%s", quec_ufs_vendor_info);
+
+	return;
+}
+
+EXPORT_SYMBOL(quectel_get_ufs_vendor_info);
+
+void quectel_get_ufs_model_info(char *buf, int size)
+{
+	size = (size < sizeof(quec_ufs_vendor_info)) ? size:sizeof(quec_ufs_vendor_info);
+	snprintf(buf, sizeof(quec_ufs_model_info), "%s", quec_ufs_model_info);
+
+	return;
+}
+
+EXPORT_SYMBOL(quectel_get_ufs_model_info);
+
+#endif /* QUECTEL_QDEVINFO_CMD */
+
 /**
  * scsi_add_lun - allocate and fully initialze a scsi_device
  * @sdev:	holds information to be stored in the new scsi_device
@@ -873,6 +901,11 @@ static int scsi_add_lun(struct scsi_device *sdev, unsigned char *inq_result,
 			sdev->vendor, sdev->model, sdev->rev,
 			sdev->inq_periph_qual, inq_result[2] & 0x07,
 			(inq_result[3] & 0x0f) == 1 ? " CCS" : "");
+
+	#ifdef QUECTEL_QDEVINFO_CMD
+		snprintf(quec_ufs_vendor_info, sizeof(quec_ufs_vendor_info), "%s", sdev->vendor);
+		snprintf(quec_ufs_model_info, sizeof(quec_ufs_model_info), "%s", sdev->model);
+	#endif
 
 	if ((sdev->scsi_level >= SCSI_2) && (inq_result[7] & 2) &&
 	    !(*bflags & BLIST_NOTQ)) {

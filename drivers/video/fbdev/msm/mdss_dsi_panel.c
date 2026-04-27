@@ -2947,6 +2947,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	pinfo->mipi.force_clk_lane_hs = of_property_read_bool(np,
 		"qcom,mdss-dsi-force-clock-lane-hs");
 
+	pr_err("[kevin]pinfo->mipi.force_clk_lane_hs = %d\n",pinfo->mipi.force_clk_lane_hs);
 	pinfo->skip_panel_reset =
 		of_property_read_bool(np, "qcom,mdss-skip-panel-reset");
 

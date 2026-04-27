@@ -3195,8 +3195,6 @@ static void fastrpc_glink_notify_rx(void *handle, const void *priv,
 		spin_unlock_irqrestore(&me->ctxlock, irq_flags);
 		goto bail;
 	}
-	me->ctxtable[index]->handle = handle;
-	me->ctxtable[index]->ptr = ptr;
 	spin_unlock_irqrestore(&me->ctxlock, irq_flags);
 
 	context_notify_user(me->ctxtable[index], rsp->retval);
@@ -3204,6 +3202,7 @@ bail:
 	if (err) {
 		glink_rx_done(handle, ptr, true);
 		pr_err("adsprpc: invalid response or context\n");
+		glink_rx_done(handle, ptr, true);
 	}
 }
 

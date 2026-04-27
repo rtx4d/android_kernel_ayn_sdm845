@@ -16,8 +16,8 @@
 #include "governor.h"
 
 /* Default constants for DevFreq-Simple-Ondemand (DFSO) */
-#define DFSO_UPTHRESHOLD	(90)
-#define DFSO_DOWNDIFFERENCTIAL	(5)
+#define DFSO_UPTHRESHOLD	(70)
+#define DFSO_DOWNDIFFERENCTIAL	(30)
 static int devfreq_simple_ondemand_func(struct devfreq *df,
 					unsigned long *freq)
 {
@@ -29,6 +29,7 @@ static int devfreq_simple_ondemand_func(struct devfreq *df,
 	struct devfreq_simple_ondemand_data *data = df->data;
 	unsigned long max = (df->max_freq) ? df->max_freq : UINT_MAX;
 	unsigned long min = (df->min_freq) ? df->min_freq : 0;
+	static unsigned int busy_time_count = 0;
 
 	err = devfreq_update_stats(df);
 	if (err)
@@ -65,6 +66,12 @@ static int devfreq_simple_ondemand_func(struct devfreq *df,
 		return 0;
 	}
 
+	if (stat->busy_time == 0) {
+		busy_time_count++;
+	} else {
+		busy_time_count = 0;
+	}
+
 	/* Assume MAX if it is going to be divided by zero */
 	if (stat->total_time == 0) {
 		*freq = max;
@@ -87,7 +94,12 @@ static int devfreq_simple_ondemand_func(struct devfreq *df,
 	/* Keep the current frequency */
 	if (stat->busy_time * 100 >
 	    stat->total_time * (dfso_upthreshold - dfso_downdifferential)) {
-		*freq = stat->current_frequency;
+		*freq = max - 100000000;
+		return 0;
+	}
+	if (stat->busy_time * 100 >
+	    stat->total_time * (dfso_upthreshold - dfso_downdifferential -10)) {
+		*freq = max - 150000000;
 		return 0;
 	}
 
@@ -99,11 +111,34 @@ static int devfreq_simple_ondemand_func(struct devfreq *df,
 	b = div_u64(b, (dfso_upthreshold - dfso_downdifferential / 2));
 	*freq = (unsigned long) b;
 
-	if (df->min_freq && *freq < df->min_freq)
-		*freq = df->min_freq;
-	if (df->max_freq && *freq > df->max_freq)
+	if (df->min_freq && *freq < df->min_freq) {
+		if (busy_time_count > 8) {
+			*freq = df->min_freq;
+			busy_time_count = 0;
+		} else {
+			if (stat->busy_time < 60) {
+				*freq = df->min_freq + 30000000;
+			} else if (stat->busy_time < 300) {
+				*freq = df->min_freq + 110000000;
+			} else if (stat->busy_time < 1000) {
+				*freq = df->min_freq + 200000000;
+			} else {
+				*freq = df->min_freq + 300000000;
+			}
+		}
+		return 0;
+	}
+	if (df->max_freq && *freq > df->max_freq) {
 		*freq = df->max_freq;
+		return 0;
+	}
 
+	if (*freq < stat->current_frequency) {
+		*freq = stat->current_frequency - 110000000;
+	}
+	if (*freq > stat->current_frequency) {
+		*freq = stat->current_frequency + 30000000;
+	}
 	return 0;
 }
 
