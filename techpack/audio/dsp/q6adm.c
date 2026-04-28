@@ -2449,6 +2449,11 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
 		 __func__, port_id, path, rate, channel_mode, perf_mode,
 		 topology);
 
+	if (topology == 131860) {
+		bit_width = 24;
+		pr_debug("%s: Audio Copp topology 0x%x is used, set to 24bit \n", __func__, topology);
+	}
+
 	port_id = q6audio_convert_virtual_to_portid(port_id);
 	port_idx = adm_validate_and_get_port_index(port_id);
 	if (port_idx < 0) {
