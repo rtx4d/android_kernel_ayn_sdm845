@@ -40,9 +40,6 @@
 		qcom,mdss-dsi-te-check-enable;
 		qcom,mdss-dsi-te-using-te-pin;
 		//qcom,mdss-dsi-te-using-wd;
-#ifdef CONFIG_VENDOR_AYN_ODIN_M2
-		qcom,mdss-dsi-panel-orientation = "180";
-#endif
 
 		qcom,mdss-dsi-display-timings {
 			timing@0{
@@ -60,30 +57,6 @@
 				qcom,mdss-dsi-v-top-border = <0>;
 				qcom,mdss-dsi-v-bottom-border = <0>;
 				qcom,mdss-dsi-panel-framerate = <60>;
-#ifdef CONFIG_VENDOR_AYN_ODIN_M0
-				qcom,mdss-dsi-on-command = [
-					29 01 00 00 00 00 02 B0 00
-					29 01 00 00 00 00 18 C2 01 F7 80 08 68 08 0C 10 00 08 70 00 00 00 00 00 00 00 03 83 00 00 00
-					29 01 00 00 00 00 02 D6 01
-					29 01 00 00 00 00 02 B0 03	
-					39 01 00 00 00 00 05 2A 00 00 04 37
-					39 01 00 00 00 00 05 2B 00 00 07 7F
-					05 01 00 00 00 00 02 35 00
-					05 01 00 00 96 00 01 11
-					05 01 00 00 32 00 01 29];
-#endif
-#ifdef CONFIG_VENDOR_AYN_ODIN_M2
-				qcom,mdss-dsi-on-command = [
-					29 01 00 00 00 00 02 B0 00
-					29 01 00 00 00 00 18 C2 01 F7 80 04 68 08 09 10 00 08 30 00 00 00 00 00 00 00 02 80 00 00 00
-					29 01 00 00 00 00 02 D6 01
-					29 01 00 00 00 00 02 B0 03
-					39 01 00 00 00 00 05 2A 00 00 04 37
-					39 01 00 00 00 00 05 2B 00 00 07 7F
-					05 01 00 00 00 00 02 35 00
-					05 01 00 00 96 00 01 11
-					05 01 00 00 32 00 01 29];
-#endif
 				qcom,mdss-dsi-off-command = [
 					05 01 00 00 05 00 02 28 00
 					05 01 00 00 53 00 02 10 00

@@ -462,9 +462,6 @@
 		synaptics,reset-delay-ms = <200>;
 		synaptics,reset-on-state = <0>;
 		synaptics,reset-active-ms = <20>;
-#ifdef CONFIG_VENDOR_AYN_ODIN_M2
-		synaptics,x-flip = <1>;
-#endif
 	};
 };
 //zhounengwen@163.com begin
