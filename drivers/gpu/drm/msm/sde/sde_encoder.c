@@ -3088,7 +3088,10 @@ static void sde_encoder_virt_disable(struct drm_encoder *drm_enc)
 
 
 	/* wait for idle */
+	pr_err("[sde_dbg] encoder_disable start: enc=%d is_primary=%d\n",
+		   DRMID(drm_enc), sde_enc->disp_info.is_primary);
 	sde_encoder_wait_for_event(drm_enc, MSM_ENC_TX_COMPLETE);
+	pr_err("[sde_dbg] encoder_disable wait_done: enc=%d\n", DRMID(drm_enc));
 
 	kthread_flush_work(&sde_enc->input_event_work);
 
@@ -3147,6 +3150,7 @@ static void sde_encoder_virt_disable(struct drm_encoder *drm_enc)
 
 	SDE_DEBUG_ENC(sde_enc, "encoder disabled\n");
 
+	pr_err("[sde_dbg] encoder_disable complete: enc=%d\n", DRMID(drm_enc));
 	sde_rm_release(&sde_kms->rm, drm_enc);
 }
 

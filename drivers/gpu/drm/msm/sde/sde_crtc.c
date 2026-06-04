@@ -4195,6 +4195,7 @@ static void sde_crtc_disable(struct drm_crtc *crtc)
 	struct sde_crtc_state *cstate;
 	struct drm_encoder *encoder;
 	struct msm_drm_private *priv;
+	pr_err("[sde_dbg] crtc_disable: crtc=%d\n", crtc ? crtc->base.id : -1);
 	unsigned long flags;
 	struct sde_crtc_irq_info *node = NULL;
 	struct drm_event event;
