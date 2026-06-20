@@ -159,10 +159,10 @@
 		 * binding: physical "up" sits on gpio52, "down" on gpio122,
 		 * "left" on gpio128, "right" on gpio124.
 		 */
-		dpad-up-gpios     = <&tlmm  52 GPIO_ACTIVE_LOW>;
-		dpad-down-gpios   = <&tlmm 122 GPIO_ACTIVE_LOW>;
-		dpad-left-gpios   = <&tlmm 128 GPIO_ACTIVE_LOW>;
-		dpad-right-gpios  = <&tlmm 124 GPIO_ACTIVE_LOW>;
+		dpad-up-gpios     = <&tlmm 124 GPIO_ACTIVE_LOW>;
+		dpad-down-gpios   = <&tlmm 128 GPIO_ACTIVE_LOW>;
+		dpad-left-gpios   = <&tlmm  52 GPIO_ACTIVE_LOW>;
+		dpad-right-gpios  = <&tlmm 122 GPIO_ACTIVE_LOW>;
 
 		west-btn-gpios    = <&tlmm  41 GPIO_ACTIVE_LOW>;
 		north-btn-gpios   = <&tlmm  92 GPIO_ACTIVE_LOW>;
