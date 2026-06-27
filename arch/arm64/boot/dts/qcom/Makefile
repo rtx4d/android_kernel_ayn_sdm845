@@ -4,8 +4,8 @@ dtb-$(CONFIG_ARCH_QCOM)	+= apq8096-db820c.dtb
 
 ifeq ($(CONFIG_VENDOR_AYN_ODIN_M0),y)
 	dtbo-$(CONFIG_ARCH_SDM845) += \
-		ayn/m0/sdm845-v2.1-mtp-m0-overlay.dtbo \
-		ayn/m0/sdm845-v2.1-oem-m0-overlay.dtbo
+		sdm845-v2.1-mtp-m0-overlay.dtbo \
+		sdm845-v2.1-oem-m0-overlay.dtbo
 
 sdm845-v2.1-mtp-m0-overlay.dtbo-base := sdm845-v2.1.dtb
 sdm845-v2.1-oem-m0-overlay.dtbo-base := sdm845-v2.1.dtb
