@@ -138,10 +138,10 @@ MODULE_PARM_DESC(center_ry_uv, "Resting microvolts for right stick Y (gpio21), I
  */
 static int span_pos_lx_uv = 580000;
 module_param(span_pos_lx_uv, int, 0644);
-static int span_neg_lx_uv = 580000;
+static int span_neg_lx_uv = 450000;
 module_param(span_neg_lx_uv, int, 0644);
 
-static int span_pos_ly_uv = 3750;
+static int span_pos_ly_uv = 3700;
 module_param(span_pos_ly_uv, int, 0644);
 static int span_neg_ly_uv = 6650;
 module_param(span_neg_ly_uv, int, 0644);
@@ -151,9 +151,9 @@ module_param(span_pos_rx_uv, int, 0644);
 static int span_neg_rx_uv = 6100;
 module_param(span_neg_rx_uv, int, 0644);
 
-static int span_pos_ry_uv = 525000;
+static int span_pos_ry_uv = 510000;
 module_param(span_pos_ry_uv, int, 0644);
-static int span_neg_ry_uv = 555000;
+static int span_neg_ry_uv = 390000;
 module_param(span_neg_ry_uv, int, 0644);
 
 /*
@@ -164,7 +164,42 @@ module_param(span_neg_ry_uv, int, 0644);
  */
 static int deadzone_pct = 15;
 module_param(deadzone_pct, int, 0644);
-MODULE_PARM_DESC(deadzone_pct, "Radial stick deadzone, percent (stock 15)");
+MODULE_PARM_DESC(deadzone_pct, "Radial stick deadzone, percent (stock 15) — fallback/default for both sticks");
+
+/*
+ * Per-stick deadzone overrides. -1 = "use deadzone_pct" (the shared
+ * default), 0..90 = that stick's own deadzone percent. Left and right
+ * sticks wear differently and the user calibrates them separately, so
+ * each gets its own dead band.
+ */
+static int deadzone_left_pct = 10;
+module_param(deadzone_left_pct, int, 0644);
+MODULE_PARM_DESC(deadzone_left_pct, "Left stick deadzone percent (-1=use deadzone_pct)");
+
+static int deadzone_right_pct = 20;
+module_param(deadzone_right_pct, int, 0644);
+MODULE_PARM_DESC(deadzone_right_pct, "Right stick deadzone percent (-1=use deadzone_pct)");
+
+/*
+ * Octagonal-gate compensation, percent.
+ *
+ * The Odin stick has a physical gate that lets the cardinals reach full
+ * travel but limits the DIAGONALS: measured on-device, a 45° push only
+ * reaches ~0.83 of the unit circle (round at the cardinals, pinched on
+ * the diagonals). Games that expect a full circular range therefore
+ * can't reach diagonal extremes ("teardrop"/octagon).
+ *
+ * After per-axis normalization we know the angle of the (nx,ny) vector.
+ * The gate radius as a function of angle is ~1 at the cardinals and dips
+ * to gate_min on the diagonals; we divide the vector by that radius so
+ * the measured gate maps onto the unit circle. gate_comp_pct sets how
+ * much the diagonals are boosted: it is the percent by which a 45° push
+ * is scaled up. 0 disables (pure square envelope, previous behaviour);
+ * ~20 (=1/0.83) maps the measured gate to a full circle. Clamp [0,80].
+ */
+static int gate_comp_pct = 20;
+module_param(gate_comp_pct, int, 0644);
+MODULE_PARM_DESC(gate_comp_pct, "Diagonal gate compensation, percent boost at 45° (0=off, ~20=full circle)");
 
 /*
  * Per-axis start-of-motion deadband, in microvolts, subtracted from the
@@ -191,7 +226,7 @@ module_param(flat_ry_uv, int, 0644);
  * Stick sensitivity, percent (stock default 1.0 = 100, min 0.5 = 50).
  * The normalized vector is multiplied by this after the deadzone.
  */
-static int sensitivity_pct = 100;
+static int sensitivity_pct = 180;
 module_param(sensitivity_pct, int, 0644);
 MODULE_PARM_DESC(sensitivity_pct, "Stick output gain, percent (stock 100, min 50)");
 
@@ -461,9 +496,12 @@ struct odin_gamepad {
 
 	/*
 	 * Mirrors of the most recent values *reported* to the input
-	 * subsystem. Used to skip redundant input_report_* calls so
-	 * userspace tools like getevent are not flooded with duplicate
-	 * SYN_REPORTs every ADC tick.
+	 * subsystem (post-deadzone / post-clamp, i.e. exactly what was
+	 * passed to input_report_abs). Used to skip redundant
+	 * input_report_* calls so userspace tools like getevent are not
+	 * flooded with duplicate SYN_REPORTs every ADC tick — in
+	 * particular a stick resting inside its deadzone keeps mapping to
+	 * 0 and must emit nothing.
 	 */
 	s16 reported_lx, reported_ly;
 	s16 reported_rx, reported_ry;
@@ -915,12 +953,34 @@ static void odin_learn_span(struct odin_axis_rt *ax, s64 dx)
 }
 
 /*
- * STAGE 1 radial transform for one stick. Reads the smoothed µV of both
- * axes, applies the per-axis start-of-motion flat deadband, normalizes
- * each by its own (flat-reduced) per-sign half-span into [-ODIN_NORM,
- * ODIN_NORM], applies the stock radial deadzone (with re-normalization
- * so motion starts at 0 just past the edge) and the sensitivity gain,
- * then writes the ±ODIN_STICK_CARDINAL outputs.
+ * Per-axis deadzone with edge re-normalization, operating on a single
+ * normalized axis value n in [-ODIN_NORM, ODIN_NORM]. |n| <= dz maps to
+ * 0; beyond dz the magnitude is rescaled so it leaves 0 at the dead-band
+ * edge and still reaches ODIN_NORM at full deflection:
+ *   out = sign(n) * N * (|n| - dz) / (N - dz)
+ * This is the 1-D form of the stock re-normalization, applied to each
+ * axis independently so X and Y never steal range from each other.
+ */
+static s64 odin_axis_deadzone(s64 n, s64 dz)
+{
+	s64 a = n < 0 ? -n : n;
+	s64 out;
+
+	if (a <= dz)
+		return 0;
+	if (ODIN_NORM - dz <= 0)
+		return n;
+
+	out = div_s64((a - dz) * ODIN_NORM, ODIN_NORM - dz);
+	return n < 0 ? -out : out;
+}
+
+/*
+ * STAGE 1 transform for one stick. Reads the smoothed µV of both axes,
+ * applies the per-axis start-of-motion flat deadband, normalizes each by
+ * its own (flat-reduced) per-sign half-span into [-ODIN_NORM, ODIN_NORM],
+ * applies a per-axis (square) deadzone with edge re-normalization and the
+ * sensitivity gain, then writes the ±ODIN_STICK_CARDINAL outputs.
  *
  * Polarity matches the old odin_scale_stick exactly: the normalized
  * value keeps the sign of (raw - center) and is negated only when the
@@ -933,14 +993,14 @@ static void odin_learn_span(struct odin_axis_rt *ax, s64 dx)
  */
 static void odin_radial(struct odin_axis_rt *x_ax, struct odin_axis_rt *y_ax,
 			s64 x_uv, s64 y_uv, int x_idx, int y_idx,
-			s16 *out_x, s16 *out_y)
+			int dz_pct, s16 *out_x, s16 *out_y)
 {
 	s64 dx = x_uv - x_ax->center;
 	s64 dy = y_uv - y_ax->center;
 	int flat_x = odin_param_flat(x_idx);
 	int flat_y = odin_param_flat(y_idx);
 	int spx, spy;
-	s64 nx, ny, mag, dz, num, den;
+	s64 nx, ny, dz;
 
 	odin_learn_span(x_ax, dx);
 	odin_learn_span(y_ax, dy);
@@ -976,32 +1036,84 @@ static void odin_radial(struct odin_axis_rt *x_ax, struct odin_axis_rt *y_ax,
 	nx = clamp_t(s64, nx, -ODIN_NORM, ODIN_NORM);
 	ny = clamp_t(s64, ny, -ODIN_NORM, ODIN_NORM);
 
-	/* Radial magnitude in the same fixed-point unit (max ≈ 4096·√2). */
-	mag = int_sqrt((unsigned long)(nx * nx + ny * ny));
-	if (mag > ODIN_NORM)
-		mag = ODIN_NORM;
+	/*
+	 * Per-axis (square) deadzone instead of a shared radial magnitude.
+	 *
+	 * The earlier radial model computed mag = hypot(nx, ny), clamped it
+	 * to ODIN_NORM, then re-normalized both axes by (mag-dz)/((N-dz)*mag).
+	 * That couples the axes: this stick's vertical travel is physically
+	 * asymmetric (up span ~3750 µV vs down ~6650 µV), so a diagonal push
+	 * UP drives ny to full scale on its short span while X is only part
+	 * way out. The shared magnitude saturates at ODIN_NORM from ny alone
+	 * and the re-normalization then steals range from nx — the reachable
+	 * area collapses to a point at the top ("teardrop": round at the
+	 * bottom, pinched at the top). Measured X reach at the rim was ±1336
+	 * downward but only ~790 upward.
+	 *
+	 * Treating each axis independently (a square envelope) lets the
+	 * corners be reached symmetrically on both halves. Each axis still
+	 * gets the stock per-axis deadzone with edge re-normalization so the
+	 * value leaves 0 smoothly just past the dead band and still reaches
+	 * full scale at the rim.
+	 */
+	dz = (s64)ODIN_NORM * clamp(dz_pct, 0, 90) / 100;
+	nx = odin_axis_deadzone(nx, dz);
+	ny = odin_axis_deadzone(ny, dz);
 
-	dz = (s64)ODIN_NORM * clamp(deadzone_pct, 0, 90) / 100;
-	if (mag <= dz) {
-		*out_x = 0;
-		*out_y = 0;
-		return;
+	/*
+	 * Octagonal-gate compensation, magnitude-only.
+	 *
+	 * The physical gate pinches the diagonals: the reachable rim is a
+	 * circle of radius ~1.0 on the cardinals shrinking to ~gate(d) on the
+	 * diagonals, where d = 2*|nx|*|ny|/(nx^2+ny^2) is "diagonality"
+	 * (0 cardinal .. ODIN_NORM diagonal). To map that gate onto a full
+	 * circle we scale ONLY the magnitude, leaving the direction (nx:ny
+	 * ratio) untouched, so the output is monotonic along any radial sweep
+	 * — no "step back" near the cardinals.
+	 *
+	 *   gate(d) = 1 - (gc/100)*(d/N)        (gc = gate_comp_pct)
+	 *   scale   = 1 / gate(d)   (>= 1, bigger on the diagonals)
+	 *   (nx,ny) *= scale,  then clamp magnitude to ODIN_NORM.
+	 *
+	 * Because the boost is applied uniformly to both components (a pure
+	 * magnitude stretch) and then radially clamped, a cardinal (d=0,
+	 * scale=1) is untouched while a diagonal is pushed out to the rim.
+	 * Unlike the old per-component (1+gc*d) gain, the magnitude here is
+	 * monotonic in stick deflection, which removes the wobble.
+	 */
+	{
+		int gc = clamp(gate_comp_pct, 0, 80);
+
+		if (gc && (nx || ny)) {
+			s64 ax = nx < 0 ? -nx : nx;
+			s64 ay = ny < 0 ? -ny : ny;
+			s64 sumsq = nx * nx + ny * ny;
+			/* d in ODIN_NORM units; sumsq>=1 since (nx||ny). */
+			s64 d = div_s64(2 * ax * ay * ODIN_NORM, sumsq);
+			/* gate = N - (gc*d)/100, the shrunken rim radius (fixed pt). */
+			s64 gate = ODIN_NORM - div_s64((s64)gc * d, 100);
+
+			/* scale = N/gate (>=1); guard gate>0. */
+			if (gate > 0) {
+				nx = div_s64(nx * ODIN_NORM, gate);
+				ny = div_s64(ny * ODIN_NORM, gate);
+			}
+		}
 	}
 
 	/*
-	 * Re-normalize so the magnitude just past the deadzone maps to 0
-	 * and full deflection still maps to 1.0. Stock applies a per-
-	 * component factor f = (m - dz)/((1 - dz_frac)*m) to each axis.
-	 * In our unit (N = "1.0") that is f = N*(m - dz)/((N - dz)*m), so
-	 *   nx' = nx * N * (m - dz) / ((N - dz) * m)
-	 * which leaves nx/ny back in [-N, N]. Max nx*num*N ≈ 4096³ ≈ 7e10,
-	 * comfortably inside s64.
+	 * Clamp to the unit CIRCLE (magnitude <= ODIN_NORM), not per-axis.
+	 * The gate stretch above can push a near-diagonal slightly past the
+	 * rim; a radial clamp scales both axes down together so the edge
+	 * stays smooth and monotonic. Cardinals (one axis 0) are unaffected.
 	 */
-	num = mag - dz;
-	den = (s64)(ODIN_NORM - dz) * mag;
-	if (den > 0) {
-		nx = div_s64(nx * num * ODIN_NORM, den);
-		ny = div_s64(ny * num * ODIN_NORM, den);
+	{
+		s64 mag = int_sqrt((unsigned long)(nx * nx + ny * ny));
+
+		if (mag > ODIN_NORM) {
+			nx = div_s64(nx * ODIN_NORM, mag);
+			ny = div_s64(ny * ODIN_NORM, mag);
+		}
 	}
 
 	/* Sensitivity gain (percent), then map to ±cardinal. */
@@ -1229,12 +1341,14 @@ static int odin_adc_thread(void *arg)
 		if (odin->axis[ODIN_ADC_LX].centered &&
 		    odin->axis[ODIN_ADC_LY].centered) {
 			s16 ox, oy;
+			int dzl = deadzone_left_pct >= 0 ?
+				  deadzone_left_pct : deadzone_pct;
 
 			odin_radial(&odin->axis[ODIN_ADC_LX],
 				    &odin->axis[ODIN_ADC_LY],
 				    odin->smooth_uv[ODIN_ADC_LX],
 				    odin->smooth_uv[ODIN_ADC_LY],
-				    ODIN_ADC_LX, ODIN_ADC_LY, &ox, &oy);
+				    ODIN_ADC_LX, ODIN_ADC_LY, dzl, &ox, &oy);
 			odin->last_lx = ox;
 			odin->last_ly = oy;
 		} else {
@@ -1244,12 +1358,14 @@ static int odin_adc_thread(void *arg)
 		if (odin->axis[ODIN_ADC_RX].centered &&
 		    odin->axis[ODIN_ADC_RY].centered) {
 			s16 ox, oy;
+			int dzr = deadzone_right_pct >= 0 ?
+				  deadzone_right_pct : deadzone_pct;
 
 			odin_radial(&odin->axis[ODIN_ADC_RX],
 				    &odin->axis[ODIN_ADC_RY],
 				    odin->smooth_uv[ODIN_ADC_RX],
 				    odin->smooth_uv[ODIN_ADC_RY],
-				    ODIN_ADC_RX, ODIN_ADC_RY, &ox, &oy);
+				    ODIN_ADC_RX, ODIN_ADC_RY, dzr, &ox, &oy);
 			odin->last_rx = ox;
 			odin->last_ry = oy;
 		} else {
@@ -1264,39 +1380,53 @@ static int odin_adc_thread(void *arg)
 		if (odin->input) {
 			bool any = false;
 
+			/*
+			 * Gate every report on the value actually delivered to
+			 * the input subsystem (post-deadzone / post-clamp), NOT
+			 * on the raw radial output. At rest the raw value
+			 * jitters ±1 LSB around centre every tick while
+			 * odin_map_stick() keeps mapping it to 0; comparing raw
+			 * therefore re-sent an identical SYN_REPORT ~180×/s and
+			 * flooded getevent (and, in recovery, drowned the
+			 * touchscreen's event stream). Comparing the mapped
+			 * value means a stick sitting in its deadzone emits
+			 * nothing at all.
+			 */
 			if (!(odin->ignore_mask & ODIN_IGN_LEFT_STICK)) {
+				s16 vx = odin_map_stick(&odin->calib_left.x,
+							odin->last_lx);
+				s16 vy = odin_map_stick(&odin->calib_left.y,
+							odin->last_ly);
+
 				if (!odin->axes_initialized ||
-				    odin->last_lx != odin->reported_lx) {
-					input_report_abs(odin->input, ABS_X,
-						odin_map_stick(&odin->calib_left.x,
-							       odin->last_lx));
-					odin->reported_lx = odin->last_lx;
+				    vx != odin->reported_lx) {
+					input_report_abs(odin->input, ABS_X, vx);
+					odin->reported_lx = vx;
 					any = true;
 				}
 				if (!odin->axes_initialized ||
-				    odin->last_ly != odin->reported_ly) {
-					input_report_abs(odin->input, ABS_Y,
-						odin_map_stick(&odin->calib_left.y,
-							       odin->last_ly));
-					odin->reported_ly = odin->last_ly;
+				    vy != odin->reported_ly) {
+					input_report_abs(odin->input, ABS_Y, vy);
+					odin->reported_ly = vy;
 					any = true;
 				}
 			}
 			if (!(odin->ignore_mask & ODIN_IGN_RIGHT_STICK)) {
+				s16 vx = odin_map_stick(&odin->calib_right.x,
+							odin->last_rx);
+				s16 vy = odin_map_stick(&odin->calib_right.y,
+							odin->last_ry);
+
 				if (!odin->axes_initialized ||
-				    odin->last_rx != odin->reported_rx) {
-					input_report_abs(odin->input, ABS_RX,
-						odin_map_stick(&odin->calib_right.x,
-							       odin->last_rx));
-					odin->reported_rx = odin->last_rx;
+				    vx != odin->reported_rx) {
+					input_report_abs(odin->input, ABS_RX, vx);
+					odin->reported_rx = vx;
 					any = true;
 				}
 				if (!odin->axes_initialized ||
-				    odin->last_ry != odin->reported_ry) {
-					input_report_abs(odin->input, ABS_RY,
-						odin_map_stick(&odin->calib_right.y,
-							       odin->last_ry));
-					odin->reported_ry = odin->last_ry;
+				    vy != odin->reported_ry) {
+					input_report_abs(odin->input, ABS_RY, vy);
+					odin->reported_ry = vy;
 					any = true;
 				}
 			}
@@ -1307,14 +1437,18 @@ static int odin_adc_thread(void *arg)
 					input_report_key(odin->input, BTN_TL2,
 							 odin->last_hat2y < mid);
 					any = true;
-				} else if (!odin->axes_initialized ||
-					   odin->last_hat2y != odin->reported_hat2y) {
-					input_report_abs(odin->input, ABS_HAT2Y,
-						clamp_t(int, odin->last_hat2y,
+				} else {
+					u16 v = clamp_t(int, odin->last_hat2y,
 							odin->calib_hat_left.min,
-							odin->calib_hat_left.max));
-					odin->reported_hat2y = odin->last_hat2y;
-					any = true;
+							odin->calib_hat_left.max);
+
+					if (!odin->axes_initialized ||
+					    v != odin->reported_hat2y) {
+						input_report_abs(odin->input,
+								 ABS_HAT2Y, v);
+						odin->reported_hat2y = v;
+						any = true;
+					}
 				}
 			}
 			if (!(odin->ignore_mask & ODIN_IGN_HAT2X)) {
@@ -1324,14 +1458,18 @@ static int odin_adc_thread(void *arg)
 					input_report_key(odin->input, BTN_TR2,
 							 odin->last_hat2x < mid);
 					any = true;
-				} else if (!odin->axes_initialized ||
-					   odin->last_hat2x != odin->reported_hat2x) {
-					input_report_abs(odin->input, ABS_HAT2X,
-						clamp_t(int, odin->last_hat2x,
+				} else {
+					u16 v = clamp_t(int, odin->last_hat2x,
 							odin->calib_hat_right.min,
-							odin->calib_hat_right.max));
-					odin->reported_hat2x = odin->last_hat2x;
-					any = true;
+							odin->calib_hat_right.max);
+
+					if (!odin->axes_initialized ||
+					    v != odin->reported_hat2x) {
+						input_report_abs(odin->input,
+								 ABS_HAT2X, v);
+						odin->reported_hat2x = v;
+						any = true;
+					}
 				}
 			}
 			odin->axes_initialized = true;
@@ -1442,6 +1580,35 @@ static ssize_t raw_show(struct device *dev, struct device_attribute *attr,
 	return ret;
 }
 static DEVICE_ATTR_RO(raw);
+
+/*
+ * TEMP DEBUG: dump raw smoothed µV and learned calibration per stick axis.
+ * Order: LY, LX, RY, RX (matches enum odin_adc / smooth_uv indexing).
+ * Each axis: uv=<smoothed µV> c=<center> +<span_pos> -<span_neg>.
+ * Remove once stick shape is dialed in.
+ */
+static ssize_t stickdbg_show(struct device *dev, struct device_attribute *attr,
+			     char *buf)
+{
+	struct odin_gamepad *odin = dev_get_drvdata(dev);
+	static const char *nm[ODIN_ADC_COUNT_STICKS] = { "LY", "LX", "RY", "RX" };
+	ssize_t ret = 0;
+	int i;
+
+	mutex_lock(&odin->lock);
+	for (i = 0; i < ODIN_ADC_COUNT_STICKS; i++) {
+		struct odin_axis_rt *ax = &odin->axis[i];
+
+		ret += scnprintf(buf + ret, PAGE_SIZE - ret,
+				 "%s uv=%lld c=%d +%d -%d%s\n",
+				 nm[i], (long long)odin->smooth_uv[i],
+				 ax->center, ax->span_pos, ax->span_neg,
+				 ax->centered ? "" : " (uncentered)");
+	}
+	mutex_unlock(&odin->lock);
+	return ret;
+}
+static DEVICE_ATTR_RO(stickdbg);
 
 static ssize_t layout_store(struct device *dev, struct device_attribute *attr,
 			    const char *buf, size_t count)
@@ -1640,6 +1807,7 @@ static DEVICE_ATTR(left_stick_axis_swap, 0644, NULL,
 static struct attribute *odin_class_attrs[] = {
 	&dev_attr_calibration.attr,
 	&dev_attr_raw.attr,
+	&dev_attr_stickdbg.attr,
 	&dev_attr_layout.attr,
 	&dev_attr_triggers.attr,
 	&dev_attr_ignore_mask.attr,
